@@ -1,13 +1,15 @@
 // Declaration of framework
-const express = require('express')
-const app = express()
-const port = 3000
+const express = require('express');
+const app = express();
+const port = 3000;
 const totp = require('notp').totp;
 const base32 = require('thirty-two');
 const request = require('request');
 const CronJob = require('cron').CronJob;
 const config = require('./config');
-var i = 0;
+const TelegramBot = require('node-telegram-bot-api');
+const telegram = new TelegramBot(config.telegram.APIKEY, { polling: true });
+var marked_price = 154.20;
 
 // Some Express stuff
 app.get('/', (req, res) => res.send('Hello World!'));
@@ -30,28 +32,55 @@ request({url: 'https://bitskins.com/api/v1/get_account_balance/?api_key='+api_ke
 
 // get specific inventory on sale using Cron (reloads every 5 seconds)
 const job = new CronJob('*/5 * * * * *', function(){
-    request.post({url: 'https://bitskins.com/api/v1/get_inventory_on_sale/?api_key='+api_key+'&sort_by=price&order=asc&market_hash_name=%E2%98%85%20M9%20Bayonet&min_price=100&max_price=150&has_stickers=-1&is_stattrak=-1&is_souvenir=-1&per_page=150&show_trade_delayed_items=1&code='+code, json:true}, function(err, res, json){
+    request.post({url: 'https://bitskins.com/api/v1/get_inventory_on_sale/?api_key='+api_key+'&sort_by=price&order=asc&market_hash_name=%E2%98%85%20M9%20Bayonet&has_stickers=-1&is_stattrak=-1&is_souvenir=-1&per_page=150&show_trade_delayed_items=1&code='+code, json:true}, function(err, res, json){
     if (err) {
         throw err;
     }
       
       console.log(json);
       console.log(json['data']['items']);
-      console.log(json['data']['items'][0]['price']);
-    
-      console.log('count: ' + i);
 
-      if(json['data']['items'].length == 0){
-        console.log('No items')
+    // if there are no items
+    if(json['data']['items'].length == 0){
+        console.log('There are no items')
     }
 
-    // if hit exact price
-    if(json['data']['items'][0]['price'] == '145.00'){
-        // stop cron job, execute buying orders and etc.
-        job.stop();
-        console.log('JOB STOPPED!')
+    // if item hits exactly on or below marked price
+    for (var i = 0; i < json['data']['items'].length; i++){
+        if(json['data']['items'][i]['price'] <= marked_price){
+            telegram.sendPhoto(config.telegram.myChatID, json['data']['items'][i]['image'],{caption: 'Item name: '+json['data']['items'][i]['market_hash_name']+'\nItem ID: '+json['data']['items'][i]['item_id']+'\nPrice: ' +json['data']['items'][i]['price']+ '\nFloat: '+json['data']['items'][i]['float_value'] } );
+            // console.log('There are items that is below or equals to your marked price!');
+            // console.log('item id is: '+json['data']['items'][i]['item_id']);
+            // console.log('price is: '+json['data']['items'][i]['price']);
+            // console.log("JOB STOPPED");
+            job.stop();
+        }
     }
     i++;
 });
 });
+
+// Purchase item with Telegram bot
+telegram.onText(/\/buy (.+)/, (msg,match) => {
+    const chatid = msg.chat.id;
+    const itemid = match[1];
+
+    telegram.sendMessage(chatid, 'Making purchase right now for Item ID: ' + itemid);
+
+    request.post({url:'https://bitskins.com/api/v1/buy_item/?api_key='+api_key+'&item_ids='+itemid.toString()+'&app_id=730&allow_trade_delayed_purchases=true&prices=150&code='+code, json:true}, function(err, res, json){
+    if (err) {
+        throw err;
+    }
+
+    // if purchase fail, send why
+    if (json['status'] == 'fail'){
+        telegram.sendMessage(config.telegram.myChatID,json['data']['error_message']);
+    }
+
+});
+});
+
+// err checking
+// telegram.on("polling_error", (err) => console.log(err));
+
 job.start();
