@@ -1,0 +1,29 @@
+{
+  "name": "bitskins-api-bot",
+  "version": "1.0.1",
+  "description": "an api-bot that retrieves realtime data from Bitskins, made able to purchase in-game items.",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/kinnif/bitskins-api-bot.git"
+  },
+  "keywords": [
+    "bitskins"
+  ],
+  "author": "Kenneth Haw",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/kinnif/bitskins-api-bot/issues"
+  },
+  "homepage": "https://github.com/kinnif/bitskins-api-bot#readme",
+  "dependencies": {
+    "cron": "^1.7.0",
+    "express": "^4.16.4",
+    "notp": "^2.0.3",
+    "request": "^2.88.0",
+    "thirty-two": "^1.0.2"
+  }
+}
