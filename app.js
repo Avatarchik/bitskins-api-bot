@@ -1,86 +1,34 @@
 // Declaration of framework
+const bodyParser = require("body-parser");
 const express = require('express');
+const path = require('path');
 const app = express();
+
 const port = 3000;
-const totp = require('notp').totp;
-const base32 = require('thirty-two');
-const request = require('request');
-const CronJob = require('cron').CronJob;
-const config = require('./config');
-const TelegramBot = require('node-telegram-bot-api');
-const telegram = new TelegramBot(config.telegram.APIKEY, { polling: true });
-var marked_price = 154.20;
+var httpServer = require("http").Server(app);
 
-// Some Express stuff
-app.get('/', (req, res) => res.send('Hello World!'));
+// Import controller
+var api = require('./server/controllers/api');
 
-app.listen(port, () => console.log(`Example app listening on port ${port}!`));
+// View engine setup
+app.set('views', path.join(__dirname, 'server/views/pages'));
+app.set('view engine', 'ejs');
 
-// Declaration of my API and Secret
-var code = totp.gen(base32.decode(config.bitskins.code));
-console.log(totp.gen(base32.decode(config.bitskins.code)));
-var api_key = config.bitskins.api_key;
+//Use body Parser
+app.use(bodyParser.json());
+app.use(bodyParser.urlencoded({ extended: false }));
 
-// get my balance
-request({url: 'https://bitskins.com/api/v1/get_account_balance/?api_key='+api_key+'&code='+code, json: true}, function(err, res, json) {
-  if (err) {
-    throw err;
-  }
-  console.log('Welcome back sir, Kenneth. Your account balance is ' + json['data']['available_balance']);
-  console.log(json);
+// Application routes
+// Get
+app.get('/', api.show);
+
+// Post
+app.post('/getit',api.inventory);
+
+module.exports = app;
+
+app.set('port',port);
+
+var server = httpServer.listen(app.get('port'), function() {
+    console.log('http server listening on port '+ server.address().port)
 });
-
-// get specific inventory on sale using Cron (reloads every 5 seconds)
-const job = new CronJob('*/5 * * * * *', function(){
-    request.post({url: 'https://bitskins.com/api/v1/get_inventory_on_sale/?api_key='+api_key+'&sort_by=price&order=asc&market_hash_name=%E2%98%85%20M9%20Bayonet&has_stickers=-1&is_stattrak=-1&is_souvenir=-1&per_page=150&show_trade_delayed_items=1&code='+code, json:true}, function(err, res, json){
-    if (err) {
-        throw err;
-    }
-      
-      console.log(json);
-      console.log(json['data']['items']);
-
-    // if there are no items
-    if(json['data']['items'].length == 0){
-        console.log('There are no items')
-    }
-
-    // if item hits exactly on or below marked price
-    for (var i = 0; i < json['data']['items'].length; i++){
-        if(json['data']['items'][i]['price'] <= marked_price){
-            telegram.sendPhoto(config.telegram.myChatID, json['data']['items'][i]['image'],{caption: 'Item name: '+json['data']['items'][i]['market_hash_name']+'\nItem ID: '+json['data']['items'][i]['item_id']+'\nPrice: ' +json['data']['items'][i]['price']+ '\nFloat: '+json['data']['items'][i]['float_value'] } );
-            // console.log('There are items that is below or equals to your marked price!');
-            // console.log('item id is: '+json['data']['items'][i]['item_id']);
-            // console.log('price is: '+json['data']['items'][i]['price']);
-            // console.log("JOB STOPPED");
-            job.stop();
-        }
-    }
-    i++;
-});
-});
-
-// Purchase item with Telegram bot
-telegram.onText(/\/buy (.+)/, (msg,match) => {
-    const chatid = msg.chat.id;
-    const itemid = match[1];
-
-    telegram.sendMessage(chatid, 'Making purchase right now for Item ID: ' + itemid);
-
-    request.post({url:'https://bitskins.com/api/v1/buy_item/?api_key='+api_key+'&item_ids='+itemid.toString()+'&app_id=730&allow_trade_delayed_purchases=true&prices=150&code='+code, json:true}, function(err, res, json){
-    if (err) {
-        throw err;
-    }
-
-    // if purchase fail, send why
-    if (json['status'] == 'fail'){
-        telegram.sendMessage(config.telegram.myChatID,json['data']['error_message']);
-    }
-
-});
-});
-
-// err checking
-// telegram.on("polling_error", (err) => console.log(err));
-
-job.start();

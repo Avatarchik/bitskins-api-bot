@@ -20,10 +20,13 @@
   },
   "homepage": "https://github.com/kinnif/bitskins-api-bot#readme",
   "dependencies": {
+    "body-parser": "^1.18.3",
     "cron": "^1.7.0",
+    "ejs": "^2.6.1",
     "express": "^4.16.4",
     "node-telegram-bot-api": "^0.30.0",
     "notp": "^2.0.3",
+    "pusher-client": "^1.1.0",
     "request": "^2.88.0",
     "request-promise-native": "^1.0.7",
     "thirty-two": "^1.0.2"
